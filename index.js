@@ -54,6 +54,43 @@ async function run() {
       }
     });
 
+    // get one user
+    app.get("/users/one", async (req, res) => {
+      try {
+        const email = req.query.email;
+        const query = {};
+
+        if (email) {
+          query.email = email;
+        }
+
+        const result = await usersCollection.findOne(query);
+        res.send(result);
+        // console.log(result);
+      } catch (error) {
+        console.error(error);
+        res.status(500).send({ message: "Server Error" });
+      }
+    });
+
+    // update user info
+    app.patch("/users/:id/info", async (req, res) => {
+      try {
+        const id = req.params.id;
+
+        // const updatedInfo = req.body;
+        // console.log(updatedInfo);
+
+        const filter = { _id: new ObjectId(id) };
+        const updatedDoc = { $set: req.body };
+        const result = await usersCollection.updateOne(filter, updatedDoc);
+        res.send(result);
+      } catch (error) {
+        console.error(error);
+        res.status(500).send({ message: "Server Error" });
+      }
+    });
+
     // update user role
     app.patch("/users/:id", async (req, res) => {
       try {
@@ -154,6 +191,9 @@ async function run() {
         res.status(500).send({ message: "Server Error" });
       }
     });
+
+    // update contest role
+    
 
     // update contest
     app.patch("/contests/:id/update", async (req, res) => {
