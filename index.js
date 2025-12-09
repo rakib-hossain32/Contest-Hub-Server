@@ -96,8 +96,19 @@ async function run() {
 
     // contest related api's
 
-    // get all contests by email
+    // get all by admin
     app.get("/contests", async (req, res) => {
+      try {
+        const result = await contestsCollection.find().toArray();
+        res.send(result);
+      } catch (error) {
+        console.error(error);
+        res.status(500).send({ message: "Server Error" });
+      }
+    });
+
+    // get all contests by creator email
+    app.get("/contests/creator", async (req, res) => {
       try {
         const email = req.query.email;
         const query = {};
