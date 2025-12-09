@@ -26,16 +26,45 @@ async function run() {
 
     const database = client.db("Contest_Hub");
     const usersCollection = database.collection("users");
+    const contestsCollection = database.collection("contests");
+
+    // get all user
+    app.get("/users", async (req, res) => {
+      try {
+        const result = await usersCollection.find().toArray();
+        res.send(result);
+      } catch (error) {
+        console.error(error);
+        res.status(500).send({ message: "Server Error" });
+      }
+    });
 
     //   user role get
     app.get("/users/:email/role", async (req, res) => {
       try {
-          const  email  = req.params.email;
+        const email = req.params.email;
         //   console.log(email)
         const query = { email };
-          const result = await usersCollection.findOne(query)
+        const result = await usersCollection.findOne(query);
         //   console.log(result)
         res.send({ role: result?.role || "user" });
+      } catch (error) {
+        console.error(error);
+        res.status(500).send({ message: "Server Error" });
+      }
+    });
+
+    // update user role
+    app.patch("/users/:id", async (req, res) => {
+      try {
+        const id = req.params.id;
+
+        console.log(id, req.body);
+
+        const filter = { _id: new ObjectId(id) };
+        const updatedDoc = { $set: req.body };
+        const result = await usersCollection.updateOne(filter, updatedDoc);
+        res.send(result);
       } catch (error) {
         console.error(error);
         res.status(500).send({ message: "Server Error" });
@@ -48,6 +77,7 @@ async function run() {
         const user = req.body;
         user.role = "user";
         user.createdAt = new Date();
+        user.status = "Active";
 
         const email = user.email;
 
@@ -58,6 +88,101 @@ async function run() {
 
         const result = await usersCollection.insertOne(req.body);
         res.status(201).send(result);
+      } catch (error) {
+        console.error(error);
+        res.status(500).send({ message: "Server Error" });
+      }
+    });
+
+    // contest related api's
+
+    // get all contests by email
+    app.get("/contests", async (req, res) => {
+      try {
+        const email = req.query.email;
+        const query = {};
+        // console.log(email);
+        if (!email) {
+          return res.send({ message: "creator email not found" });
+        } else {
+          query.email = email;
+        }
+
+        const result = await contestsCollection.find(query).toArray();
+        res.send(result);
+      } catch (error) {
+        console.error(error);
+        res.status(500).send({ message: "Server Error" });
+      }
+    });
+
+    // get one contest
+    app.get("/contests/:id", async (req, res) => {
+      try {
+        const id = req.params.id;
+        const query = { _id: new ObjectId(id) };
+        const result = await contestsCollection.findOne(query);
+        res.send(result);
+      } catch (error) {
+        console.error(error);
+        res.status(500).send({ message: "Server Error" });
+      }
+    });
+
+    // created contest
+    app.post("/contests", async (req, res) => {
+      try {
+        const contest = req.body;
+        // console.log(contest);
+        contest.status = "Pending";
+        contest.createdAt = new Date();
+        const result = await contestsCollection.insertOne(contest);
+        res.status(201).send(result);
+      } catch (error) {
+        console.error(error);
+        res.status(500).send({ message: "Server Error" });
+      }
+    });
+
+    // update contest
+    app.patch("/contests/:id/update", async (req, res) => {
+      try {
+        const id = req.params.id;
+
+        // console.log(req.body);
+        const contest = req.body;
+
+        const contestInfo = {
+          deadline: contest.deadline,
+          description: contest.description,
+          image: contest.image,
+          instructions: contest.instructions,
+          name: contest.name,
+          price: contest.price,
+          prizeMoney: contest.prizeMoney,
+          type: contest.type,
+        };
+        // console.log(updatedDoc);
+
+        const filter = { _id: new ObjectId(id) };
+        const updatedDoc = {
+          $set: contestInfo,
+        };
+        const result = await contestsCollection.updateOne(filter, updatedDoc);
+        res.send(result);
+      } catch (error) {
+        console.error(error);
+        res.status(500).send({ message: "Server Error" });
+      }
+    });
+
+    // deleted contest
+    app.delete("/contests/:id", async (req, res) => {
+      try {
+        const id = req.params.id;
+        const query = { _id: new ObjectId(id) };
+        const result = await contestsCollection.deleteOne(query);
+        res.send(result);
       } catch (error) {
         console.error(error);
         res.status(500).send({ message: "Server Error" });
