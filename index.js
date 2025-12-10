@@ -192,10 +192,25 @@ async function run() {
       }
     });
 
-    // update contest role
-    
+    // update contest role for admin
+    app.patch("/contests/:id/admin", async (req, res) => {
+      try {
+        const status = req.body.newStatus;
+        // console.log(status)
 
-    // update contest
+        const id = req.params.id;
+        const filter = { _id: new ObjectId(id) };
+        const updatedDoc = { $set: {status} };
+        // console.log('check',filter,req.body)
+        const result = await contestsCollection.updateOne(filter, updatedDoc);
+        res.send(result);
+      } catch (error) {
+        console.error(error);
+        res.status(500).send({ message: "Server Error" });
+      }
+    });
+
+    // update contest for creator
     app.patch("/contests/:id/update", async (req, res) => {
       try {
         const id = req.params.id;
