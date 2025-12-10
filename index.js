@@ -164,6 +164,25 @@ async function run() {
       }
     });
 
+    // get all contest for all users
+    app.get("/contests/all-users", async (req, res) => {
+      try {
+        const status = req.query.status;
+        // console.log(status);
+        const query = {};
+
+        if (status) {
+          query.status = status;
+        }
+
+        const result = await contestsCollection.find(query).toArray();
+        res.send(result);
+      } catch (error) {
+        console.error(error);
+        res.status(500).send({ message: "Server Error" });
+      }
+    });
+
     // get one contest
     app.get("/contests/:id", async (req, res) => {
       try {
@@ -200,7 +219,7 @@ async function run() {
 
         const id = req.params.id;
         const filter = { _id: new ObjectId(id) };
-        const updatedDoc = { $set: {status} };
+        const updatedDoc = { $set: { status } };
         // console.log('check',filter,req.body)
         const result = await contestsCollection.updateOne(filter, updatedDoc);
         res.send(result);
