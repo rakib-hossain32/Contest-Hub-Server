@@ -3,6 +3,8 @@ const { MongoClient, ServerApiVersion, ObjectId } = require("mongodb");
 require("dotenv").config();
 const app = express();
 const cors = require("cors");
+const stripe = require("stripe")(process.env.STRIPE_SECRET);
+
 const port = process.env.PORT || 3000;
 
 app.use(express.json());
@@ -27,6 +29,7 @@ async function run() {
     const database = client.db("Contest_Hub");
     const usersCollection = database.collection("users");
     const contestsCollection = database.collection("contests");
+    const paymentsCollection = database.collection("payments");
 
     // get all user
     app.get("/users", async (req, res) => {
@@ -131,6 +134,89 @@ async function run() {
       }
     });
 
+    // PAYMENTS RELATED API'S
+    app.post("/create-checkout-session", async (req, res) => {
+      const paymentInfo = req.body;
+      // console.log(paymentInfo);
+      const amount = parseInt(paymentInfo.contestPrice) * 100;
+
+      const session = await stripe.checkout.sessions.create({
+        line_items: [
+          {
+            price_data: {
+              currency: "USD",
+              unit_amount: amount,
+              product_data: {
+                name: paymentInfo?.contestName,
+                description: paymentInfo?.contestDescription,
+                images: [paymentInfo?.contestImage],
+              },
+            },
+            quantity: 1,
+          },
+        ],
+        customer_email: paymentInfo?.participant?.email,
+        mode: "payment",
+        metadata: {
+          contestId: paymentInfo.contestId,
+          customer: paymentInfo.participant.email,
+        },
+        success_url: `${process.env.SITE_DOMAIN}/contest/payment-success?session_id={CHECKOUT_SESSION_ID}`,
+        cancel_url: `${process.env.SITE_DOMAIN}/contest/payment-cancelled`,
+      });
+      res.send({ url: session.url });
+    });
+
+    // post payment
+    app.post("/payment-success", async (req, res) => {
+      try {
+        const { sessionId } = req.body;
+
+        const session = await stripe.checkout.sessions.retrieve(sessionId);
+
+        const transactionId = session.payment_intent;
+        const contestId = session.metadata.contestId;
+        const query = { contestId };
+
+        // console.log(session);
+
+        const paymentExist = await paymentsCollection.findOne(query);
+        if (paymentExist) {
+          return res.send({
+            message: "already exists",
+            transactionId,
+            amount: session.amount_total / 100,
+          });
+        }
+
+        const payment = {
+          transactionId: session.payment_intent,
+          paymentStatus: session.payment_status,
+          amount: session.amount_total / 100,
+          currency: session.currency,
+          contestParticipantEmail: session.customer_email,
+          contestId: session.metadata.contestId,
+          paidAt: new Date(),
+        };
+        // console.log(payment);
+
+        if (session.payment_status === "paid") {
+          const resultPayment = await paymentsCollection.insertOne(payment);
+
+          // console.log(resultPayment);
+          res.send({
+            success: true,
+            paymentInfo: resultPayment,
+            amount: session.amount_total / 100,
+            transactionId: session.payment_intent,
+          });
+        }
+      } catch (error) {
+        console.error(error);
+        res.status(500).send({ message: "Server Error" });
+      }
+    });
+
     // contest related api's
 
     // get all by admin
@@ -183,6 +269,24 @@ async function run() {
       }
     });
 
+    // get popular contests
+    app.get("/contests/popular-contests", async (req, res) => {
+      try {
+        const status = req.query.status;
+        // console.log(status);
+        const sortFields = { participants: -1 };
+        const limitNum = 6;
+        const result = await contestsCollection
+          .find({ status })
+          .sort(sortFields)
+          .limit(limitNum)
+          .toArray();
+        res.send(result);
+      } catch (error) {
+        console.error(error);
+        res.status(500).send({ message: "Server Error" });
+      }
+    });
     // get one contest
     app.get("/contests/:id", async (req, res) => {
       try {
