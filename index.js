@@ -200,6 +200,7 @@ async function run() {
           contestId: session.metadata.contestId,
           contestDeadline: session.metadata.deadline,
           contestName: session.metadata.name,
+          submitted: null,
           paidAt: new Date(),
         };
         // console.log(payment);
@@ -245,12 +246,50 @@ async function run() {
         //   query.contestParticipantEmail = contestParticipantEmail;
         // }
         const sortFields = { contestDeadline: 1 };
-      
+
         const result = await paymentsCollection
           .find(query)
           .sort(sortFields)
           .toArray();
         res.send(result);
+      } catch (error) {
+        console.error(error);
+        res.status(500).send({ message: "Server Error" });
+      }
+    });
+
+    // payments task-submitted
+    app.get("/payments/task-submitted", async (req, res) => {
+      try {
+        const { contestId } = req.query;
+        // console.log(query)
+        const submitted = true;
+
+        const query = { contestId, submitted };
+        // console.log(query);
+        const result = await paymentsCollection.find(query).toArray();
+        // console.log(result, query);
+        res.send(result);
+      } catch (error) {
+        console.error(error);
+        res.status(500).send({ message: "Server Error" });
+      }
+    });
+
+    // submitted true and task submitted
+    app.patch("/payments/:id", async (req, res) => {
+      try {
+        const id = req.params.id;
+        const { contestParticipantEmail } = req.query;
+        const filter = { _id: new ObjectId(id), contestParticipantEmail };
+
+        const updatedDoc = {
+          $set: req.body,
+        };
+        // console.log(filter, updatedDoc, contestParticipantEmail);
+        const result = await paymentsCollection.updateOne(filter, updatedDoc);
+        res.send(result);
+        console.log(result);
       } catch (error) {
         console.error(error);
         res.status(500).send({ message: "Server Error" });
