@@ -160,6 +160,8 @@ async function run() {
         metadata: {
           contestId: paymentInfo.contestId,
           customer: paymentInfo.participant.email,
+          deadline: paymentInfo.contestDeadline,
+          name: paymentInfo?.contestName,
         },
         success_url: `${process.env.SITE_DOMAIN}/contest/payment-success?session_id={CHECKOUT_SESSION_ID}`,
         cancel_url: `${process.env.SITE_DOMAIN}/contest/payment-cancelled`,
@@ -196,6 +198,8 @@ async function run() {
           currency: session.currency,
           contestParticipantEmail: session.customer_email,
           contestId: session.metadata.contestId,
+          contestDeadline: session.metadata.deadline,
+          contestName: session.metadata.name,
           paidAt: new Date(),
         };
         // console.log(payment);
