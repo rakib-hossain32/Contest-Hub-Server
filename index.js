@@ -99,7 +99,7 @@ async function run() {
       try {
         const id = req.params.id;
 
-        console.log(id, req.body);
+        // console.log(id, req.body);
 
         const filter = { _id: new ObjectId(id) };
         const updatedDoc = { $set: req.body };
@@ -175,6 +175,7 @@ async function run() {
         const { sessionId } = req.body;
 
         const session = await stripe.checkout.sessions.retrieve(sessionId);
+        // console.log(session);
 
         const transactionId = session.payment_intent;
         // const contestId = session.metadata.contestId;
@@ -188,6 +189,7 @@ async function run() {
             message: "already exists",
             transactionId,
             amount: session.amount_total / 100,
+            contestId: session.metadata.contestId,
           });
         }
 
@@ -214,7 +216,46 @@ async function run() {
             paymentInfo: resultPayment,
             amount: session.amount_total / 100,
             transactionId: session.payment_intent,
+            contestId: session.metadata.contestId,
           });
+        }
+
+        // participants added
+        if (session.payment_status === "paid") {
+          const contestId = session.metadata.contestId;
+          // console.log("contest id", contestId);
+          const query = { _id: new ObjectId(contestId) };
+
+          const participantsResult = await contestsCollection.findOne(query, {
+            projection: { participants: 1 },
+          });
+
+          const { participants } = participantsResult;
+          // console.log(contestResult,participants);
+          if (!participants) {
+            const participantsIncrease = await contestsCollection.updateOne(
+              query,
+              {
+                $set: {
+                  participants: 1,
+                },
+              }
+            );
+
+            // console.log("inside zero participants", participantsIncrease);
+          }
+
+          const totalParticipants = parseInt(participants) + 1;
+          // console.log("par", totalParticipants, participants);
+
+          const participantsIncrease = await contestsCollection.updateOne(
+            query,
+            {
+              $set: { participants: totalParticipants },
+            }
+          );
+
+          // console.log("outside zero participants", participantsIncrease);
         }
       } catch (error) {
         console.error(error);
@@ -289,7 +330,7 @@ async function run() {
         // console.log(filter, updatedDoc, contestParticipantEmail);
         const result = await paymentsCollection.updateOne(filter, updatedDoc);
         res.send(result);
-        console.log(result);
+        // console.log(result);
       } catch (error) {
         console.error(error);
         res.status(500).send({ message: "Server Error" });
