@@ -177,8 +177,8 @@ async function run() {
         const session = await stripe.checkout.sessions.retrieve(sessionId);
 
         const transactionId = session.payment_intent;
-        const contestId = session.metadata.contestId;
-        const query = { contestId };
+        // const contestId = session.metadata.contestId;
+        const query = { transactionId };
 
         // console.log(session);
 
@@ -215,6 +215,42 @@ async function run() {
             transactionId: session.payment_intent,
           });
         }
+      } catch (error) {
+        console.error(error);
+        res.status(500).send({ message: "Server Error" });
+      }
+    });
+
+    // payment status
+    app.get("/payments/payment-status", async (req, res) => {
+      try {
+        const { contestId, contestParticipantEmail } = req.query;
+        // console.log(contestId, contestParticipantEmail);
+        const query = { contestId, contestParticipantEmail };
+        // console.log(query)
+        const result = await paymentsCollection.findOne(query);
+        res.send(result);
+      } catch (error) {
+        console.error(error);
+        res.status(500).send({ message: "Server Error" });
+      }
+    });
+
+    // participated contests
+    app.get("/payments/all-contests", async (req, res) => {
+      try {
+        const contestParticipantEmail = req.query.contestParticipantEmail;
+        const query = { contestParticipantEmail };
+        // if (contestParticipantEmail) {
+        //   query.contestParticipantEmail = contestParticipantEmail;
+        // }
+        const sortFields = { contestDeadline: 1 };
+      
+        const result = await paymentsCollection
+          .find(query)
+          .sort(sortFields)
+          .toArray();
+        res.send(result);
       } catch (error) {
         console.error(error);
         res.status(500).send({ message: "Server Error" });
