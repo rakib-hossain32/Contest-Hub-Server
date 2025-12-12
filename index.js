@@ -405,6 +405,26 @@ async function run() {
       }
     });
 
+    // contests winner get by winner email
+    app.get("/contests/winner/contests", async (req, res) => {
+      try {
+        const email = req.query.email;
+        // console.log(email)
+        // const query = {}
+        // if (email) {
+        //   query.winner.email: email
+        // }
+
+        const result = await contestsCollection
+          .find({ "winner.email": email })
+          .toArray();
+        res.send(result);
+      } catch (error) {
+        console.error(error);
+        res.status(500).send({ message: "Server Error" });
+      }
+    });
+
     // created contest
     app.post("/contests", async (req, res) => {
       try {
