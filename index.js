@@ -223,7 +223,6 @@ async function run() {
         // participants added
         if (session.payment_status === "paid") {
           const contestId = session.metadata.contestId;
-          // console.log("contest id", contestId);
           const query = { _id: new ObjectId(contestId) };
 
           const participantsResult = await contestsCollection.findOne(query, {
@@ -231,31 +230,17 @@ async function run() {
           });
 
           const { participants } = participantsResult;
-          // console.log(contestResult,participants);
-          if (!participants) {
-            const participantsIncrease = await contestsCollection.updateOne(
-              query,
-              {
-                $set: {
-                  participants: 1,
-                },
-              }
-            );
 
-            // console.log("inside zero participants", participantsIncrease);
-          }
+          // Default 0 if undefined / null / ""
+          const current = parseInt(participants) || 0;
 
-          const totalParticipants = parseInt(participants) + 1;
-          // console.log("par", totalParticipants, participants);
+          const totalParticipants = current + 1;
 
-          const participantsIncrease = await contestsCollection.updateOne(
-            query,
-            {
-              $set: { participants: totalParticipants },
-            }
-          );
+          await contestsCollection.updateOne(query, {
+            $set: { participants: totalParticipants },
+          });
 
-          // console.log("outside zero participants", participantsIncrease);
+          console.log("Updated participants:", totalParticipants);
         }
       } catch (error) {
         console.error(error);
@@ -445,6 +430,26 @@ async function run() {
         const filter = { _id: new ObjectId(id) };
         const updatedDoc = { $set: { status } };
         // console.log('check',filter,req.body)
+        const result = await contestsCollection.updateOne(filter, updatedDoc);
+        res.send(result);
+      } catch (error) {
+        console.error(error);
+        res.status(500).send({ message: "Server Error" });
+      }
+    });
+
+    // contest winner updated by creator
+    app.patch("/contests/:id/creator", async (req, res) => {
+      try {
+        const win = req.body;
+        const id = req.params.id;
+        const filter = { _id: new ObjectId(id) };
+        // console.log(filter, i);
+        const updatedDoc = {
+          $set: {
+            winner: win,
+          },
+        };
         const result = await contestsCollection.updateOne(filter, updatedDoc);
         res.send(result);
       } catch (error) {
