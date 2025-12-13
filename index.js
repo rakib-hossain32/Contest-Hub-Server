@@ -94,6 +94,45 @@ async function run() {
       }
     });
 
+    // updated win count
+    app.patch("/users/win-count/:email", async (req, res) => {
+      try {
+        const email = req.params.email;
+
+        const userResult = await usersCollection.findOne(
+          { email },
+          {
+            projection: { winCount: 1 },
+          }
+        );
+        // console.log(userResult);
+
+        const { winCount } = userResult;
+        // console.log(winCount);
+
+        // Default 0 if undefined / null / ""
+        const current = parseInt(winCount) || 0;
+
+        const totalWinCount = current + 1;
+        // console.log(totalWinCount)
+
+        const result = await usersCollection.updateOne(
+          { email },
+          {
+            $set: { winCount: totalWinCount },
+          }
+        );
+
+        // const filter = { _id: new ObjectId(id) };
+        // const updatedDoc = { set: req.body };
+        // const result = await usersCollection.updateOne(filter, updatedDoc);
+        res.send(result);
+      } catch (error) {
+        console.error(error);
+        res.status(500).send({ message: "Server Error" });
+      }
+    });
+
     // update user role
     app.patch("/users/:id", async (req, res) => {
       try {
@@ -240,7 +279,7 @@ async function run() {
             $set: { participants: totalParticipants },
           });
 
-          console.log("Updated participants:", totalParticipants);
+          // console.log("Updated participants:", totalParticipants);
         }
       } catch (error) {
         console.error(error);
