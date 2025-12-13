@@ -4,11 +4,38 @@ require("dotenv").config();
 const app = express();
 const cors = require("cors");
 const stripe = require("stripe")(process.env.STRIPE_SECRET);
+const admin = require("firebase-admin");
 
 const port = process.env.PORT || 3000;
 
 app.use(express.json());
 app.use(cors());
+
+const serviceAccount = require("./contest-hub-admin-SDK.json");
+
+admin.initializeApp({
+  credential: admin.credential.cert(serviceAccount),
+});
+
+// middleware
+const verifyFBToken = async (req, res, next) => {
+  const token = req.headers?.authorization;
+  // console.log(token);
+
+  if (!token) {
+    return res.status(401).send({ message: "unauthorize access" });
+  }
+
+  try {
+    const idToken = token.split(" ")[1];
+    const decoded = await admin.auth().verifyIdToken(idToken);
+    // console.log(decoded);
+    req.decoded_email = decoded.email;
+    next();
+  } catch (error) {
+    return res.status(401).send({ message: "unauthorized access" });
+  }
+};
 
 // const uri =
 //   "mongodb+srv://contest-hub:DjFjdKYgJV5PcNR4@cluster0.zneri.mongodb.net/?appName=Cluster0";
@@ -30,6 +57,22 @@ async function run() {
     const usersCollection = database.collection("users");
     const contestsCollection = database.collection("contests");
     const paymentsCollection = database.collection("payments");
+
+    // middleware more with database access
+    const verifyAdmin = async (req, res, next) => {
+      const email = req.decoded_email;
+      // console.log(req);
+      const query = { email };
+
+      const user = await usersCollection.findOne(query);
+      // console.log(user, query);
+      if (!user || user.role !== "admin") {
+        return res.status(403).send({ message: "forbidden access" });
+        // console.log("unauthorize");
+      }
+
+      next();
+    };
 
     // get all user
     app.get("/users", async (req, res) => {
@@ -134,7 +177,7 @@ async function run() {
     });
 
     // update user role
-    app.patch("/users/:id", async (req, res) => {
+    app.patch("/users/:id", verifyFBToken, verifyAdmin, async (req, res) => {
       try {
         const id = req.params.id;
 
@@ -342,7 +385,7 @@ async function run() {
     });
 
     // submitted true and task submitted
-    app.patch("/payments/:id", async (req, res) => {
+    app.patch("/payments/:id", verifyFBToken, async (req, res) => {
       try {
         const id = req.params.id;
         const { contestParticipantEmail } = req.query;
@@ -364,7 +407,7 @@ async function run() {
     // contest related api's
 
     // get all by admin
-    app.get("/contests", async (req, res) => {
+    app.get("/contests", verifyFBToken, verifyAdmin, async (req, res) => {
       try {
         const result = await contestsCollection.find().toArray();
         res.send(result);
@@ -375,7 +418,7 @@ async function run() {
     });
 
     // get all contests by creator email
-    app.get("/contests/creator", async (req, res) => {
+    app.get("/contests/creator", verifyFBToken, async (req, res) => {
       try {
         const email = req.query.email;
         const query = {};
@@ -432,7 +475,7 @@ async function run() {
       }
     });
     // get one contest
-    app.get("/contests/:id", async (req, res) => {
+    app.get("/contests/:id", verifyFBToken, async (req, res) => {
       try {
         const id = req.params.id;
         const query = { _id: new ObjectId(id) };
@@ -445,7 +488,7 @@ async function run() {
     });
 
     // contests winner get by winner email
-    app.get("/contests/winner/contests", async (req, res) => {
+    app.get("/contests/winner/contests", verifyFBToken, async (req, res) => {
       try {
         const email = req.query.email;
         // console.log(email)
@@ -465,7 +508,7 @@ async function run() {
     });
 
     // created contest
-    app.post("/contests", async (req, res) => {
+    app.post("/contests", verifyFBToken, async (req, res) => {
       try {
         const contest = req.body;
         // console.log(contest);
@@ -480,25 +523,31 @@ async function run() {
     });
 
     // update contest role for admin
-    app.patch("/contests/:id/admin", async (req, res) => {
-      try {
-        const status = req.body.newStatus;
-        // console.log(status)
+    app.patch(
+      "/contests/:id/admin",
 
-        const id = req.params.id;
-        const filter = { _id: new ObjectId(id) };
-        const updatedDoc = { $set: { status } };
-        // console.log('check',filter,req.body)
-        const result = await contestsCollection.updateOne(filter, updatedDoc);
-        res.send(result);
-      } catch (error) {
-        console.error(error);
-        res.status(500).send({ message: "Server Error" });
+      verifyFBToken,
+      verifyAdmin,
+      async (req, res) => {
+        try {
+          const status = req.body.newStatus;
+          // console.log(status)
+
+          const id = req.params.id;
+          const filter = { _id: new ObjectId(id) };
+          const updatedDoc = { $set: { status } };
+          // console.log('check',filter,req.body)
+          const result = await contestsCollection.updateOne(filter, updatedDoc);
+          res.send(result);
+        } catch (error) {
+          console.error(error);
+          res.status(500).send({ message: "Server Error" });
+        }
       }
-    });
+    );
 
     // contest winner updated by creator
-    app.patch("/contests/:id/creator", async (req, res) => {
+    app.patch("/contests/:id/creator", verifyFBToken, async (req, res) => {
       try {
         const win = req.body;
         const id = req.params.id;
@@ -518,7 +567,7 @@ async function run() {
     });
 
     // update contest for creator
-    app.patch("/contests/:id/update", async (req, res) => {
+    app.patch("/contests/:id/update", verifyFBToken, async (req, res) => {
       try {
         const id = req.params.id;
 
@@ -549,8 +598,26 @@ async function run() {
       }
     });
 
-    // deleted contest
-    app.delete("/contests/:id", async (req, res) => {
+    // deleted contest by admin
+    app.delete(
+      "/contests/:id",
+
+      verifyFBToken,
+      verifyAdmin,
+      async (req, res) => {
+        try {
+          const id = req.params.id;
+          const query = { _id: new ObjectId(id) };
+          const result = await contestsCollection.deleteOne(query);
+          res.send(result);
+        } catch (error) {
+          console.error(error);
+          res.status(500).send({ message: "Server Error" });
+        }
+      }
+    );
+    // deleted contest by creator
+    app.delete("/contests/creator/:id", verifyFBToken, async (req, res) => {
       try {
         const id = req.params.id;
         const query = { _id: new ObjectId(id) };
