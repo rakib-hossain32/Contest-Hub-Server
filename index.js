@@ -11,7 +11,13 @@ const port = process.env.PORT || 3000;
 app.use(express.json());
 app.use(cors());
 
-const serviceAccount = require("./contest-hub-admin-SDK.json");
+// const serviceAccount = require("./contest-hub-admin-SDK.json");
+// const serviceAccount = require("./firebase-admin-key.json");
+
+const decoded = Buffer.from(process.env.FB_SERVICE_KEY, "base64").toString(
+  "utf8"
+);
+const serviceAccount = JSON.parse(decoded);
 
 admin.initializeApp({
   credential: admin.credential.cert(serviceAccount),
@@ -417,6 +423,33 @@ async function run() {
       }
     });
 
+    // /contests/all-users/search
+    app.get("/contests/all-users/search", async (req, res) => {
+      try {
+        const { searchText } = req.query;
+       
+        let query = {
+          status: "Confirmed",
+        };
+
+       
+        if (searchText) {
+          query.$or = [
+           
+            { name: { $regex: searchText, $options: "i" } },
+           
+            { type: { $regex: searchText, $options: "i" } }, 
+          ];
+        }
+
+        const result = await contestsCollection.find(query).toArray();
+        res.send(result);
+      } catch (error) {
+        console.error(error);
+        res.status(500).send({ message: "Server Error" });
+      }
+    });
+
     // get all contests by creator email
     app.get("/contests/creator", verifyFBToken, async (req, res) => {
       try {
@@ -630,10 +663,10 @@ async function run() {
     });
 
     // Send a ping to confirm a successful connection
-    await client.db("admin").command({ ping: 1 });
-    console.log(
-      "Pinged your deployment. You successfully connected to MongoDB!"
-    );
+    // await client.db("admin").command({ ping: 1 });
+    // console.log(
+    //   "Pinged your deployment. You successfully connected to MongoDB!"
+    // );
   } finally {
     // Ensures that the client will close when you finish/error
     // await client.close();
