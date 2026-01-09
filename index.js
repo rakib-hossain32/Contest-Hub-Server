@@ -57,12 +57,13 @@ const client = new MongoClient(process.env.DB_URI, {
 async function run() {
   try {
     // Connect the client to the server	(optional starting in v4.7)
-    await client.connect();
+    // await client.connect();
 
     const database = client.db("Contest_Hub");
     const usersCollection = database.collection("users");
     const contestsCollection = database.collection("contests");
     const paymentsCollection = database.collection("payments");
+    const reviewsCollection = database.collection("reviews");
 
     // middleware more with database access
     const verifyAdmin = async (req, res, next) => {
@@ -80,8 +81,53 @@ async function run() {
       next();
     };
 
-    // get all user
-    app.get("/users", async (req, res) => {
+        // Admin Dashboard Stats
+    app.get("/admin-stats", verifyFBToken, verifyAdmin, async (req, res) => {
+      try {
+        const users = await usersCollection.estimatedDocumentCount();
+        const contests = await contestsCollection.estimatedDocumentCount();
+        const reviews = await reviewsCollection.estimatedDocumentCount();
+
+        // মোট রেভিনিউ ক্যালকুলেট করা (পেমেন্ট কালেকশন থেকে)
+        const payments = await paymentsCollection.find().toArray();
+        const totalRevenue = payments.reduce((sum, payment) => sum + (payment.amount || 0), 0);
+
+        // চার্টের জন্য ডামি বা রিয়েল ডাটা (এটি চার্টে দেখাবে)
+        const revenueChart = [
+          { name: "Jan", revenue: 4000, users: 2400 },
+          { name: "Feb", revenue: 3000, users: 1398 },
+          { name: "Mar", revenue: 2000, users: 9800 },
+          { name: "Apr", revenue: 2780, users: 3908 },
+          { name: "May", revenue: 1890, users: 4800 },
+          { name: "Jun", revenue: 2390, users: 3800 },
+        ];
+
+        res.send({
+          users,
+          contests,
+          reviews,
+          revenue: totalRevenue,
+          revenueChart
+        });
+      } catch (error) {
+        res.status(500).send({ message: "Server Error" });
+      }
+    });
+
+    // // get all user
+    app.get("/users", verifyFBToken, verifyAdmin, async (req, res) => {
+      const page = parseInt(req.query.page) || 0;
+      const size = parseInt(req.query.size) || 10;
+      
+      const result = await usersCollection.find()
+        .skip(page * size)
+        .limit(size)
+        .toArray();
+      res.send(result);
+        });
+    
+    // get user leaderboard
+    app.get("/users/leaderboard", async (req, res) => {
       try {
         const result = await usersCollection.find().toArray();
         res.send(result);
@@ -658,6 +704,57 @@ async function run() {
         res.send(result);
       } catch (error) {
         console.error(error);
+        res.status(500).send({ message: "Server Error" });
+      }
+    });
+
+    // Get ALL reviews for Admin (Pending + Approved)
+    app.get("/reviews/all", verifyFBToken, verifyAdmin, async (req, res) => {
+      const result = await reviewsCollection.find().toArray();
+      res.send(result);
+    });
+
+    // get all reviews
+    app.get("/reviews", async (req, res) => {
+      try {
+       const query = { status: 'approved' };
+    const result = await reviewsCollection.find(query).toArray();
+    res.send(result);
+      } catch (error) {
+        console.error(error);
+        res.status(500).send({ message: "Server Error" });
+      }
+    });
+
+    // post review
+    app.post('/reviews', verifyFBToken, async (req, res) => {
+    const review = req.body;
+    review.status = 'pending'; // Default status for admin review
+    review.createdAt = new Date();
+    
+    const result = await reviewsCollection.insertOne(review);
+    res.send(result);
+    });
+
+    // update review
+    app.patch('/reviews/:id', verifyFBToken, verifyAdmin, async (req, res) => {
+    const id = req.params.id;
+    const filter = { _id: new ObjectId(id) };
+    const updateDoc = {
+        $set: { status: 'approved' }
+    };
+    const result = await reviewsCollection.updateOne(filter, updateDoc);
+    res.send(result);
+    });
+    
+        // delete review by admin
+    app.delete("/reviews/:id", verifyFBToken, verifyAdmin, async (req, res) => {
+      try {
+        const id = req.params.id;
+        const query = { _id: new ObjectId(id) };
+        const result = await reviewsCollection.deleteOne(query);
+        res.send(result);
+      } catch (error) {
         res.status(500).send({ message: "Server Error" });
       }
     });
