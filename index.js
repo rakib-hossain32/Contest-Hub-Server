@@ -81,7 +81,7 @@ async function run() {
       next();
     };
 
-        // Admin Dashboard Stats
+    // Admin Dashboard Stats
     app.get("/admin-stats", verifyFBToken, verifyAdmin, async (req, res) => {
       try {
         const users = await usersCollection.estimatedDocumentCount();
@@ -90,7 +90,10 @@ async function run() {
 
         // মোট রেভিনিউ ক্যালকুলেট করা (পেমেন্ট কালেকশন থেকে)
         const payments = await paymentsCollection.find().toArray();
-        const totalRevenue = payments.reduce((sum, payment) => sum + (payment.amount || 0), 0);
+        const totalRevenue = payments.reduce(
+          (sum, payment) => sum + (payment.amount || 0),
+          0,
+        );
 
         // চার্টের জন্য ডামি বা রিয়েল ডাটা (এটি চার্টে দেখাবে)
         const revenueChart = [
@@ -107,7 +110,7 @@ async function run() {
           contests,
           reviews,
           revenue: totalRevenue,
-          revenueChart
+          revenueChart,
         });
       } catch (error) {
         res.status(500).send({ message: "Server Error" });
@@ -118,14 +121,15 @@ async function run() {
     app.get("/users", verifyFBToken, verifyAdmin, async (req, res) => {
       const page = parseInt(req.query.page) || 0;
       const size = parseInt(req.query.size) || 10;
-      
-      const result = await usersCollection.find()
+
+      const result = await usersCollection
+        .find()
         .skip(page * size)
         .limit(size)
         .toArray();
       res.send(result);
-        });
-    
+    });
+
     // get user leaderboard
     app.get("/users/leaderboard", async (req, res) => {
       try {
@@ -198,7 +202,7 @@ async function run() {
           { email },
           {
             projection: { winCount: 1 },
-          }
+          },
         );
         // console.log(userResult);
 
@@ -215,7 +219,7 @@ async function run() {
           { email },
           {
             $set: { winCount: totalWinCount },
-          }
+          },
         );
 
         // const filter = { _id: new ObjectId(id) };
@@ -473,18 +477,16 @@ async function run() {
     app.get("/contests/all-users/search", async (req, res) => {
       try {
         const { searchText } = req.query;
-       
+
         let query = {
           status: "Confirmed",
         };
 
-       
         if (searchText) {
           query.$or = [
-           
             { name: { $regex: searchText, $options: "i" } },
-           
-            { type: { $regex: searchText, $options: "i" } }, 
+
+            { type: { $regex: searchText, $options: "i" } },
           ];
         }
 
@@ -554,7 +556,8 @@ async function run() {
       }
     });
     // get one contest
-    app.get("/contests/:id", verifyFBToken, async (req, res) => {
+    //  app.get("/contests/:id", verifyFBToken, async (req, res)
+    app.get("/contests/:id", async (req, res) => {
       try {
         const id = req.params.id;
         const query = { _id: new ObjectId(id) };
@@ -693,7 +696,7 @@ async function run() {
           console.error(error);
           res.status(500).send({ message: "Server Error" });
         }
-      }
+      },
     );
     // deleted contest by creator
     app.delete("/contests/creator/:id", verifyFBToken, async (req, res) => {
@@ -717,9 +720,9 @@ async function run() {
     // get all reviews
     app.get("/reviews", async (req, res) => {
       try {
-       const query = { status: 'approved' };
-    const result = await reviewsCollection.find(query).toArray();
-    res.send(result);
+        const query = { status: "approved" };
+        const result = await reviewsCollection.find(query).toArray();
+        res.send(result);
       } catch (error) {
         console.error(error);
         res.status(500).send({ message: "Server Error" });
@@ -727,27 +730,27 @@ async function run() {
     });
 
     // post review
-    app.post('/reviews', verifyFBToken, async (req, res) => {
-    const review = req.body;
-    review.status = 'pending'; // Default status for admin review
-    review.createdAt = new Date();
-    
-    const result = await reviewsCollection.insertOne(review);
-    res.send(result);
+    app.post("/reviews", verifyFBToken, async (req, res) => {
+      const review = req.body;
+      review.status = "pending"; // Default status for admin review
+      review.createdAt = new Date();
+
+      const result = await reviewsCollection.insertOne(review);
+      res.send(result);
     });
 
     // update review
-    app.patch('/reviews/:id', verifyFBToken, verifyAdmin, async (req, res) => {
-    const id = req.params.id;
-    const filter = { _id: new ObjectId(id) };
-    const updateDoc = {
-        $set: { status: 'approved' }
-    };
-    const result = await reviewsCollection.updateOne(filter, updateDoc);
-    res.send(result);
+    app.patch("/reviews/:id", verifyFBToken, verifyAdmin, async (req, res) => {
+      const id = req.params.id;
+      const filter = { _id: new ObjectId(id) };
+      const updateDoc = {
+        $set: { status: "approved" },
+      };
+      const result = await reviewsCollection.updateOne(filter, updateDoc);
+      res.send(result);
     });
-    
-        // delete review by admin
+
+    // delete review by admin
     app.delete("/reviews/:id", verifyFBToken, verifyAdmin, async (req, res) => {
       try {
         const id = req.params.id;
